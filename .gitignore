@@ -1,0 +1,11 @@
+.DS_Store
+Thumbs.db
+*.swp
+.idea/
+.vscode/
+node_modules/
+# outputs saved while trying the tool
+*_out.csv
+combined.csv
+smart-csv-files.zip
+.claude/

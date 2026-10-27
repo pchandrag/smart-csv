@@ -1,0 +1,806 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>smart-csv</title>
+<meta name="description" content="Combine and reshape CSV files in your browser. Nothing is uploaded.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #f3f5f7;
+    --surface: #ffffff;
+    --text: #14202b;
+    --muted: #5b6b7a;
+    --border: #d5dce3;
+    --soft: #eaeef2;
+    --accent: #1f5fbf;
+    --accent-text: #ffffff;
+    --good: #1b7f5c;
+    --good-bg: #e2f3ec;
+    --bad: #b3372f;
+    --bad-bg: #fbe9e7;
+    --warn: #8a5a00;
+    --warn-bg: #fdf1d8;
+    color-scheme: light;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #10151b;
+      --surface: #182028;
+      --text: #e6ebf0;
+      --muted: #93a1af;
+      --border: #2b3641;
+      --soft: #212b35;
+      --accent: #6ea8ff;
+      --accent-text: #0b1a2e;
+      --good: #4cc79b;
+      --good-bg: #123328;
+      --bad: #f19a92;
+      --bad-bg: #3a1f1d;
+      --warn: #f2c66d;
+      --warn-bg: #33270e;
+      color-scheme: dark;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #10151b;
+    --surface: #182028;
+    --text: #e6ebf0;
+    --muted: #93a1af;
+    --border: #2b3641;
+    --soft: #212b35;
+    --accent: #6ea8ff;
+    --accent-text: #0b1a2e;
+    --good: #4cc79b;
+    --good-bg: #123328;
+    --bad: #f19a92;
+    --bad-bg: #3a1f1d;
+    --warn: #f2c66d;
+    --warn-bg: #33270e;
+    color-scheme: dark;
+  }
+  *, *::before, *::after { box-sizing: border-box; }
+  [hidden] { display: none !important; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    font-size: 15px;
+    line-height: 1.5;
+  }
+  .page { max-width: 1040px; margin: 0 auto; padding: 28px 16px 64px; }
+  h1 { font-size: 26px; line-height: 1.2; margin: 0 0 6px; font-weight: 600; letter-spacing: -0.01em; }
+  h2 { font-size: 17px; margin: 0 0 14px; font-weight: 600; display: flex; align-items: center; gap: 10px; }
+  h3 { font-size: 15px; margin: 0 0 8px; font-weight: 600; }
+  .lead { color: var(--muted); margin: 0 0 24px; max-width: 64ch; }
+  .card { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 18px 18px 20px; margin-bottom: 14px; }
+  .step {
+    flex: none; width: 24px; height: 24px; border-radius: 50%;
+    background: var(--soft); color: var(--muted); font-size: 13px; font-weight: 600;
+    display: inline-flex; align-items: center; justify-content: center;
+  }
+  .hint { color: var(--muted); font-size: 13.5px; }
+  .empty { color: var(--muted); margin: 10px 0 0; }
+  .mono { font-family: "IBM Plex Mono", ui-monospace, monospace; font-size: 13px; }
+  .visually-hidden { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+
+  input:focus-visible, button:focus-visible, .drop:focus-within { outline: 2px solid var(--accent); outline-offset: 2px; }
+  button {
+    font: inherit; cursor: pointer; border-radius: 6px; padding: 8px 14px;
+    border: 1px solid var(--border); background: var(--surface); color: var(--text);
+  }
+  button:hover { background: var(--soft); }
+  button.primary { background: var(--accent); color: var(--accent-text); border-color: var(--accent); font-weight: 600; }
+  button.primary:hover { filter: brightness(1.08); background: var(--accent); }
+  button:disabled { opacity: 0.4; cursor: not-allowed; filter: none; }
+  button.small { padding: 4px 10px; font-size: 13px; }
+  button.icon { padding: 2px 8px; min-width: 32px; min-height: 32px; line-height: 1; font-size: 16px; }
+  input[type="text"] {
+    font: inherit; font-size: 14px; padding: 6px 8px; width: 100%; min-width: 0;
+    background: var(--bg); color: var(--text); border: 1px solid var(--border); border-radius: 6px;
+  }
+  label.check { display: flex; gap: 10px; align-items: flex-start; font-weight: 500; cursor: pointer; }
+  label.check small { display: block; font-weight: 400; color: var(--muted); }
+  label.check input, .radios input { margin-top: 4px; width: 16px; height: 16px; accent-color: var(--accent); flex: none; }
+
+  .drop {
+    display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px;
+    padding: 22px 16px; text-align: center; cursor: pointer;
+    border: 1.5px dashed var(--border); border-radius: 8px; background: var(--bg);
+  }
+  .drop.over { border-color: var(--accent); background: var(--soft); }
+  .drop strong { font-weight: 600; }
+  .drop span { color: var(--muted); font-size: 13.5px; }
+  .filelist { list-style: none; padding: 0; margin: 12px 0 0; display: flex; flex-direction: column; gap: 6px; }
+  .filelist li { display: flex; align-items: center; gap: 10px; padding: 5px 6px 5px 10px; background: var(--soft); border-radius: 6px; font-size: 14px; }
+  .filelist .name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .filelist .meta { color: var(--muted); font-size: 13px; flex: none; }
+  .filelist button { border: none; background: transparent; color: var(--muted); }
+  .filelist button:hover { color: var(--bad); background: var(--surface); }
+  .bar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; margin-top: 10px; }
+  .bar .grow { flex: 1; }
+
+  .settings { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 16px 24px; }
+  .radios { border: none; margin: 8px 0 0 26px; padding: 0; display: flex; flex-direction: column; gap: 4px; }
+  .radios label { display: flex; gap: 8px; align-items: flex-start; cursor: pointer; font-size: 14px; }
+  .radios:disabled { opacity: 0.45; }
+
+  .cols { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.2fr); gap: 18px 24px; }
+  @media (max-width: 720px) { .cols { grid-template-columns: minmax(0, 1fr); } }
+  .collist, .outlist { list-style: none; margin: 0; padding: 0; border: 1px solid var(--border); border-radius: 8px; max-height: 460px; overflow-y: auto; }
+  .collist li, .outlist li { padding: 7px 10px; border-bottom: 1px solid var(--border); }
+  .collist li:last-child, .outlist li:last-child { border-bottom: none; }
+  .collist label { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 0 10px; cursor: pointer; }
+  .collist input { margin-top: 4px; width: 16px; height: 16px; accent-color: var(--accent); }
+  .collist .label { font-weight: 500; overflow-wrap: anywhere; }
+  .collist .example { grid-column: 2; color: var(--muted); font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .outlist li { display: grid; grid-template-columns: 2.2em minmax(0, 1fr) auto; gap: 2px 8px; align-items: center; }
+  .outlist .pos { color: var(--muted); font-size: 13px; text-align: right; }
+  .outlist .src { grid-column: 2; font-size: 12.5px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .outlist .name { grid-column: 2; }
+  .outlist .moves { grid-column: 3; grid-row: 1 / span 2; display: flex; gap: 4px; }
+  .outlist li.fixed { background: var(--soft); }
+  .outlist .badge { font-size: 12px; color: var(--muted); padding: 0 6px; align-self: center; }
+  .tools { display: flex; gap: 8px; margin: 0 0 8px; flex-wrap: wrap; }
+
+  .notice { padding: 10px 12px; border-radius: 6px; margin: 12px 0 0; font-size: 14px; }
+  .notice.error { background: var(--bad-bg); color: var(--bad); }
+  .notice.warn { background: var(--warn-bg); color: var(--warn); }
+  .notice.ok { background: var(--good-bg); color: var(--good); }
+  .notice ul { margin: 4px 0 0; padding-left: 18px; }
+
+  .table-wrap { overflow-x: auto; border: 1px solid var(--border); border-radius: 8px; margin-top: 8px; }
+  table { border-collapse: collapse; width: 100%; font-size: 13.5px; }
+  th, td { padding: 7px 10px; text-align: left; border-bottom: 1px solid var(--border); white-space: pre; max-width: 28ch; overflow: hidden; text-overflow: ellipsis; vertical-align: top; }
+  th { background: var(--soft); font-weight: 600; }
+  tr:last-child td { border-bottom: none; }
+
+  .dl-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 14px; }
+  .dl { border: 1px solid var(--border); border-radius: 8px; padding: 14px; display: flex; flex-direction: column; gap: 10px; }
+  .dl p { margin: 0; }
+  .dl label { display: flex; flex-direction: column; gap: 4px; font-size: 14px; font-weight: 500; }
+  .dl button { align-self: flex-start; margin-top: auto; }
+  footer { color: var(--muted); font-size: 13px; margin-top: 22px; }
+</style>
+</head>
+<body>
+<div class="page">
+  <h1>smart-csv</h1>
+  <p class="lead">Combine many CSV files into one, or reshape each file: choose, order and rename columns. Everything runs in this page; your files are never uploaded.</p>
+
+  <section class="card" aria-labelledby="h-files">
+    <h2 id="h-files"><span class="step">1</span>Files</h2>
+    <label class="drop" id="drop">
+      <strong>Drop CSV files here, or click to choose</strong>
+      <span>Comma, semicolon or tab separated. A file added again with the same name replaces the old one.</span>
+      <input type="file" id="pick" multiple accept=".csv,.tsv,.txt,text/csv,text/tab-separated-values" class="visually-hidden">
+    </label>
+    <p class="empty" id="filesEmpty">No files yet. Add at least one file.</p>
+    <ul class="filelist" id="fileList" aria-label="Added files"></ul>
+    <div class="bar" id="filesBar" hidden>
+      <span class="hint grow" id="filesSummary"></span>
+      <button type="button" class="small" id="clearFiles">Remove all</button>
+    </div>
+    <div class="notice error" id="readErrors" role="alert" hidden></div>
+  </section>
+
+  <section class="card" aria-labelledby="h-options">
+    <h2 id="h-options"><span class="step">2</span>Options</h2>
+    <div class="settings">
+      <label class="check"><input type="checkbox" id="optHeader" checked>
+        <span>First row is a header<small>On: columns are matched by name in every file. Off: matched by position (Column 1, Column 2, …).</small></span></label>
+      <label class="check"><input type="checkbox" id="optOutHeader" checked>
+        <span>Include header row<small>Written at the top of each output; once in a combined file.</small></span></label>
+      <div>
+        <label class="check"><input type="checkbox" id="optFileCol">
+          <span>Add file name as column 1<small>Shows which file each row came from.</small></span></label>
+        <fieldset class="radios" id="extChoice" disabled>
+          <legend class="visually-hidden">File name format</legend>
+          <label><input type="radio" name="ext" value="no" checked><span>Without extension <span class="mono">F1</span></span></label>
+          <label><input type="radio" name="ext" value="yes"><span>With extension <span class="mono">F1.csv</span></span></label>
+        </fieldset>
+      </div>
+    </div>
+  </section>
+
+  <section class="card" aria-labelledby="h-cols">
+    <h2 id="h-cols"><span class="step">3</span>Columns</h2>
+    <p class="empty" id="colsEmpty">Add files to see their columns.</p>
+    <div class="cols" id="colsWrap" hidden>
+      <div>
+        <h3 id="h-found">Found in the files</h3>
+        <div class="tools">
+          <button type="button" class="small" id="tickAll">Tick all</button>
+          <button type="button" class="small" id="tickNone">Untick all</button>
+        </div>
+        <ul class="collist" id="colList" aria-labelledby="h-found"></ul>
+      </div>
+      <div>
+        <h3 id="h-out">Output columns, in order</h3>
+        <p class="hint" style="margin:0 0 8px">Output names are used for the header row. Unticked columns are left out.</p>
+        <ol class="outlist" id="outList" aria-labelledby="h-out"></ol>
+        <p class="notice warn" id="outEmpty" hidden>Tick at least one column.</p>
+      </div>
+    </div>
+    <div class="notice warn" id="warnings" hidden></div>
+  </section>
+
+  <section class="card" aria-labelledby="h-preview">
+    <h2 id="h-preview"><span class="step">4</span>Preview</h2>
+    <p class="empty" id="previewEmpty">The first rows of the combined result appear here.</p>
+    <p class="hint" id="previewNote" hidden></p>
+    <div class="table-wrap" id="previewWrap" hidden tabindex="0" aria-label="Preview of the output"><table id="preview"></table></div>
+  </section>
+
+  <section class="card" aria-labelledby="h-dl">
+    <h2 id="h-dl"><span class="step">5</span>Download</h2>
+    <div class="dl-grid">
+      <div class="dl">
+        <h3>As one file</h3>
+        <p class="hint">All rows from every file, in file-name order.</p>
+        <label>File name<input type="text" id="combinedName" value="combined.csv" spellcheck="false"></label>
+        <button type="button" class="primary" id="saveOne">Save combined file</button>
+      </div>
+      <div class="dl">
+        <h3>As separate files</h3>
+        <p class="hint">One output for each input file.</p>
+        <label>Suffix added to each name<input type="text" id="suffix" value="_out" spellcheck="false"></label>
+        <p class="hint" id="suffixExample"></p>
+        <button type="button" class="primary" id="saveMany">Save separate files</button>
+      </div>
+    </div>
+    <p class="hint" id="saveMode"></p>
+    <div class="notice" id="status" role="status" aria-live="polite" hidden></div>
+  </section>
+
+  <footer>Output: UTF-8 with a byte-order mark, comma separated, CRLF line endings. Values are written exactly as read.</footer>
+</div>
+
+<script>
+'use strict';
+// ==CORE START==
+// The page's pure logic, loaded by tests/run-tests.js. No DOM access between these markers.
+
+// detectDelimiter, parseCSV, columnIds and toCsv are copied from the Extraction accuracy calculator
+// (accuracy-calculator.html in pchandrag/accuracyeval).
+function detectDelimiter(text) {
+  const first = (text.split(/\r?\n/, 1)[0]) || '';
+  const counts = { ',': 0, ';': 0, '\t': 0 };
+  let inQ = false;
+  for (const ch of first) {
+    if (ch === '"') inQ = !inQ;
+    else if (!inQ && Object.prototype.hasOwnProperty.call(counts, ch)) counts[ch]++;
+  }
+  let best = ',', max = 0;
+  for (const d of [',', '\t', ';']) if (counts[d] > max) { max = counts[d]; best = d; }
+  return best;
+}
+
+function parseCSV(text) {
+  if (text.charCodeAt(0) === 0xFEFF) text = text.slice(1);
+  const d = detectDelimiter(text);
+  const rows = [];
+  let row = [], field = '', inQ = false, i = 0;
+  const n = text.length;
+  while (i < n) {
+    const ch = text[i];
+    if (inQ) {
+      if (ch === '"') {
+        if (text[i + 1] === '"') { field += '"'; i += 2; continue; }
+        inQ = false; i++; continue;
+      }
+      field += ch; i++; continue;
+    }
+    if (ch === '"' && field === '') { inQ = true; i++; continue; }
+    if (ch === d) { row.push(field); field = ''; i++; continue; }
+    if (ch === '\r' || ch === '\n') {
+      if (ch === '\r' && text[i + 1] === '\n') i++;
+      row.push(field); field = ''; rows.push(row); row = []; i++; continue;
+    }
+    field += ch; i++;
+  }
+  if (field !== '' || row.length) { row.push(field); rows.push(row); }
+  return rows.filter(r => !r.every(c => c.trim() === ''));
+}
+
+// One entry per column of a file: id (used to match columns across files) and label (shown to the user).
+// With a header: matched by name, trimmed, case ignored; a repeated name becomes "name (2)", a blank one
+// "Column N". Without: matched by position.
+function columnIds(rows, hasHeader) {
+  let width = 0;
+  for (const r of rows) if (r.length > width) width = r.length;
+  const head = hasHeader && rows.length ? rows[0] : [];
+  const seen = new Map();
+  const out = [];
+  for (let i = 0; i < width; i++) {
+    if (!hasHeader) { out.push({ id: '#' + i, label: 'Column ' + (i + 1) }); continue; }
+    let label = String(head[i] == null ? '' : head[i]).trim() || 'Column ' + (i + 1);
+    const base = label.toLowerCase();
+    const n = (seen.get(base) || 0) + 1;
+    seen.set(base, n);
+    if (n > 1) label += ' (' + n + ')';
+    out.push({ id: n > 1 ? base + ' (' + n + ')' : base, label });
+  }
+  return out;
+}
+
+function toCsv(rows) {
+  const cell = v => {
+    const t = String(v == null ? '' : v);
+    return /[",\r\n]/.test(t) ? '"' + t.replace(/"/g, '""') + '"' : t;
+  };
+  return rows.map(r => r.map(cell).join(',')).join('\r\n') + '\r\n';
+}
+// ---- end of copied code ----
+
+function pick(r, idx) { return idx.map(i => (i >= 0 && i < r.length ? r[i] : '')); }
+
+// Natural file-name order: F2 before F10. Exact ties (names differing only in case) fall back to code order.
+const NATURAL = new Intl.Collator(undefined, { numeric: true, sensitivity: 'base' });
+function naturalSort(files) {
+  return files.slice().sort((a, b) => NATURAL.compare(a.name, b.name) || (a.name < b.name ? -1 : a.name > b.name ? 1 : 0));
+}
+
+function baseName(name) { return String(name).replace(/\.[^.]*$/, '') || String(name); }
+function fileLabel(name, withExt) { return withExt ? String(name) : baseName(name); }
+function cleanFileName(s) { return String(s).replace(/[\\/:*?"<>|\u0000-\u001f]/g, '_'); }
+
+// Output names for separate files: <name><suffix>.csv, in the files' order. Names that would collide
+// (e.g. F1.csv and F1.tsv) get " (2)", " (3)".
+function outputNames(files, suffix) {
+  const taken = new Set();
+  return files.map(f => {
+    const stem = cleanFileName(baseName(f.name) + (suffix == null ? '' : suffix));
+    let name = stem + '.csv', n = 1;
+    while (taken.has(name.toLowerCase())) name = stem + ' (' + (++n) + ').csv';
+    taken.add(name.toLowerCase());
+    return name;
+  });
+}
+
+// Every column found across the files, in order of first appearance (files in natural order), with an example
+// value from the first data row of the first file that has one.
+function allColumns(files, hasHeader) {
+  const out = [], byId = new Map();
+  for (const f of naturalSort(files)) {
+    const first = f.rows[hasHeader ? 1 : 0] || [];
+    columnIds(f.rows, hasHeader).forEach((c, i) => {
+      const v = first[i] == null ? '' : first[i];
+      const col = byId.get(c.id);
+      if (!col) { const nc = { id: c.id, label: c.label, example: v }; byId.set(c.id, nc); out.push(nc); }
+      else if (col.example === '' && v !== '') col.example = v;
+    });
+  }
+  return out;
+}
+
+// Builds the output rows.
+// opts: files [{ name, rows }], hasHeader, includeHeader,
+//       columns [{ id, label, name }] in output order (name: the output header),
+//       fileColumn null or { name, withExt }, suffix (for separate file names),
+//       limit: most data rows to build per output (for the preview; default all).
+// Returns { header, combined, separate: [{ name, outName, rows }], warnings: [{ file, column }] }.
+// column null in a warning means the file has no data rows.
+function buildOutput(opts) {
+  const files = naturalSort(opts.files);
+  const cols = opts.columns, fc = opts.fileColumn;
+  const limit = opts.limit == null ? Infinity : opts.limit;
+  const header = (fc ? [fc.name] : []).concat(cols.map(c => c.name));
+  const names = outputNames(files, opts.suffix);
+  const combined = opts.includeHeader ? [header] : [];
+  const separate = [], warnings = [];
+  let combinedData = 0;
+  files.forEach((f, k) => {
+    const where = new Map(columnIds(f.rows, opts.hasHeader).map((c, i) => [c.id, i]));
+    const idx = cols.map(c => (where.has(c.id) ? where.get(c.id) : -1));
+    cols.forEach((c, j) => { if (idx[j] < 0) warnings.push({ file: f.name, column: c.label }); });
+    const start = opts.hasHeader ? 1 : 0;
+    if (f.rows.length <= start) warnings.push({ file: f.name, column: null });
+    const tag = fc ? [fileLabel(f.name, fc.withExt)] : null;
+    const rows = opts.includeHeader ? [header] : [];
+    for (let r = start; r < f.rows.length && r - start < limit; r++) {
+      const row = tag ? tag.concat(pick(f.rows[r], idx)) : pick(f.rows[r], idx);
+      rows.push(row);
+      if (combinedData < limit) { combined.push(row); combinedData++; }
+    }
+    separate.push({ name: f.name, outName: names[k], rows });
+  });
+  return { header, combined, separate, warnings };
+}
+
+// The text of an output file: byte-order mark, comma separated, CRLF.
+function csvText(rows) { return '\uFEFF' + (rows.length ? toCsv(rows) : ''); }
+
+function utf8Encode(s) {
+  const out = [];
+  for (let i = 0; i < s.length; i++) {
+    let c = s.charCodeAt(i);
+    if (c >= 0xD800 && c <= 0xDBFF && i + 1 < s.length) {
+      const d = s.charCodeAt(i + 1);
+      if (d >= 0xDC00 && d <= 0xDFFF) { c = 0x10000 + ((c - 0xD800) << 10) + (d - 0xDC00); i++; }
+    }
+    if (c >= 0xD800 && c <= 0xDFFF) c = 0xFFFD; // lone surrogate
+    if (c < 0x80) out.push(c);
+    else if (c < 0x800) out.push(0xC0 | (c >> 6), 0x80 | (c & 63));
+    else if (c < 0x10000) out.push(0xE0 | (c >> 12), 0x80 | ((c >> 6) & 63), 0x80 | (c & 63));
+    else out.push(0xF0 | (c >> 18), 0x80 | ((c >> 12) & 63), 0x80 | ((c >> 6) & 63), 0x80 | (c & 63));
+  }
+  return new Uint8Array(out);
+}
+
+let CRC_TABLE = null;
+function crc32(bytes) {
+  if (!CRC_TABLE) {
+    CRC_TABLE = new Uint32Array(256);
+    for (let n = 0; n < 256; n++) {
+      let c = n;
+      for (let k = 0; k < 8; k++) c = c & 1 ? 0xEDB88320 ^ (c >>> 1) : c >>> 1;
+      CRC_TABLE[n] = c >>> 0;
+    }
+  }
+  let crc = 0xFFFFFFFF;
+  for (let i = 0; i < bytes.length; i++) crc = CRC_TABLE[(crc ^ bytes[i]) & 255] ^ (crc >>> 8);
+  return (crc ^ 0xFFFFFFFF) >>> 0;
+}
+
+// A .zip with the files stored as they are (no compression). entries: [{ name, data: Uint8Array }].
+function makeZip(entries, date) {
+  const d = date || new Date();
+  const time = (d.getHours() << 11) | (d.getMinutes() << 5) | (d.getSeconds() >> 1);
+  const day = ((Math.max(d.getFullYear(), 1980) - 1980) << 9) | ((d.getMonth() + 1) << 5) | d.getDate();
+  const parts = [], central = [];
+  let offset = 0;
+  const header = (size, fill) => { const b = new Uint8Array(size); fill(new DataView(b.buffer)); return b; };
+  for (const e of entries) {
+    const name = utf8Encode(e.name), crc = crc32(e.data), size = e.data.length;
+    const local = header(30, v => {
+      v.setUint32(0, 0x04034b50, true); v.setUint16(4, 20, true); v.setUint16(6, 0x0800, true); // UTF-8 names
+      v.setUint16(8, 0, true); v.setUint16(10, time, true); v.setUint16(12, day, true);
+      v.setUint32(14, crc, true); v.setUint32(18, size, true); v.setUint32(22, size, true);
+      v.setUint16(26, name.length, true); v.setUint16(28, 0, true);
+    });
+    central.push(header(46, v => {
+      v.setUint32(0, 0x02014b50, true); v.setUint16(4, 20, true); v.setUint16(6, 20, true); v.setUint16(8, 0x0800, true);
+      v.setUint16(10, 0, true); v.setUint16(12, time, true); v.setUint16(14, day, true);
+      v.setUint32(16, crc, true); v.setUint32(20, size, true); v.setUint32(24, size, true);
+      v.setUint16(28, name.length, true); v.setUint32(42, offset, true);
+    }), name);
+    parts.push(local, name, e.data);
+    offset += 30 + name.length + size;
+  }
+  const cdSize = central.reduce((s, b) => s + b.length, 0);
+  const end = header(22, v => {
+    v.setUint32(0, 0x06054b50, true); v.setUint16(8, entries.length, true); v.setUint16(10, entries.length, true);
+    v.setUint32(12, cdSize, true); v.setUint32(16, offset, true);
+  });
+  const all = parts.concat(central, [end]);
+  const out = new Uint8Array(all.reduce((s, b) => s + b.length, 0));
+  let at = 0;
+  for (const b of all) { out.set(b, at); at += b.length; }
+  return out;
+}
+// ==CORE END==
+
+// ---------------- page ----------------
+const $ = id => document.getElementById(id);
+const DELIM_NAMES = { ',': 'comma', ';': 'semicolon', '\t': 'tab' };
+const state = {
+  files: [],            // { name, size, rows, delim }, parsed once when added
+  columns: [],          // from allColumns()
+  order: [],            // ticked column ids, in output order
+  names: {},            // id -> output name
+  known: new Set(),     // ids seen so far; new ones are ticked automatically
+  fileColName: 'filename'
+};
+const opts = () => ({
+  hasHeader: $('optHeader').checked,
+  includeHeader: $('optOutHeader').checked,
+  fileCol: $('optFileCol').checked,
+  withExt: document.querySelector('input[name="ext"]:checked').value === 'yes'
+});
+const fmtSize = b => (b < 1024 ? b + ' B' : b < 1048576 ? (b / 1024).toFixed(1) + ' KB' : (b / 1048576).toFixed(1) + ' MB');
+const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+
+// ---- files ----
+async function addFiles(list) {
+  const errors = [];
+  for (const f of Array.from(list)) {
+    try {
+      const text = await f.text();
+      const rec = { name: f.name, size: f.size, rows: parseCSV(text), delim: detectDelimiter(text.replace(/^\uFEFF/, '')) };
+      const at = state.files.findIndex(x => x.name === f.name);
+      if (at >= 0) state.files[at] = rec; else state.files.push(rec);
+    } catch (e) {
+      errors.push(f.name + ': ' + (e && e.message || 'could not be read'));
+    }
+  }
+  $('readErrors').hidden = !errors.length;
+  $('readErrors').textContent = errors.length ? 'Could not read ' + errors.join('; ') : '';
+  refreshColumns();
+}
+
+function renderFiles() {
+  const files = naturalSort(state.files);
+  $('filesEmpty').hidden = files.length > 0;
+  $('filesBar').hidden = !files.length;
+  $('fileList').innerHTML = files.map((f, i) =>
+    '<li><span class="name mono" title="' + esc(f.name) + '">' + esc(f.name) + '</span>' +
+    '<span class="meta">' + fmtSize(f.size) + ' · ' + DELIM_NAMES[f.delim] + '</span>' +
+    '<button type="button" class="icon" data-remove="' + esc(f.name) + '" aria-label="Remove ' + esc(f.name) + '">✕</button></li>').join('');
+  const rows = files.reduce((s, f) => s + Math.max(0, f.rows.length - (opts().hasHeader ? 1 : 0)), 0);
+  $('filesSummary').textContent = files.length + (files.length === 1 ? ' file, ' : ' files, ') + rows.toLocaleString() + ' data rows';
+}
+
+// ---- columns ----
+function refreshColumns() {
+  const o = opts();
+  state.columns = allColumns(state.files, o.hasHeader);
+  const ids = new Set(state.columns.map(c => c.id));
+  state.order = state.order.filter(id => ids.has(id));
+  for (const c of state.columns) {
+    if (!state.known.has(c.id)) { state.known.add(c.id); state.order.push(c.id); }
+    if (!(c.id in state.names)) state.names[c.id] = c.label;
+  }
+  renderAll();
+}
+
+function renderColumns() {
+  const has = state.columns.length > 0;
+  $('colsEmpty').hidden = has;
+  $('colsEmpty').textContent = state.files.length ? 'The files have no columns.' : 'Add files to see their columns.';
+  $('colsWrap').hidden = !has;
+  const ticked = new Set(state.order);
+  $('colList').innerHTML = state.columns.map((c, i) =>
+    '<li><label><input type="checkbox" data-col="' + i + '"' + (ticked.has(c.id) ? ' checked' : '') + '>' +
+    '<span class="label">' + esc(c.label) + '</span>' +
+    '<span class="example" title="' + esc(c.example) + '">' + (c.example === '' ? '(blank)' : 'e.g. ' + esc(c.example)) + '</span></label></li>').join('');
+  renderOutList();
+}
+
+function renderOutList() {
+  const o = opts(), byId = new Map(state.columns.map(c => [c.id, c]));
+  const items = [];
+  if (o.fileCol) {
+    items.push('<li class="fixed"><span class="pos">1</span><span class="src">File name' + (o.withExt ? ' with extension' : '') + '</span>' +
+      '<span class="name"><input type="text" data-filecol value="' + esc(state.fileColName) + '" aria-label="Output name for the file name column" spellcheck="false"></span>' +
+      '<span class="moves"><span class="badge">always first</span></span></li>');
+  }
+  const off = o.fileCol ? 1 : 0, n = state.order.length;
+  state.order.forEach((id, k) => {
+    const c = byId.get(id);
+    items.push('<li><span class="pos">' + (k + 1 + off) + '</span><span class="src" title="' + esc(c.label) + '">from ' + esc(c.label) + '</span>' +
+      '<span class="name"><input type="text" data-name="' + k + '" value="' + esc(state.names[id]) + '" aria-label="Output name for ' + esc(c.label) + '" spellcheck="false"></span>' +
+      '<span class="moves">' +
+      '<button type="button" class="icon" data-move="-1" data-k="' + k + '"' + (k === 0 ? ' disabled' : '') + ' aria-label="Move ' + esc(c.label) + ' up">↑</button>' +
+      '<button type="button" class="icon" data-move="1" data-k="' + k + '"' + (k === n - 1 ? ' disabled' : '') + ' aria-label="Move ' + esc(c.label) + ' down">↓</button>' +
+      '<button type="button" class="icon" data-untick="' + k + '" aria-label="Remove ' + esc(c.label) + ' from the output">✕</button>' +
+      '</span></li>');
+  });
+  $('outList').innerHTML = items.join('');
+  $('outList').hidden = !items.length;
+  $('outEmpty').hidden = n > 0;
+}
+
+function outputColumns() {
+  const byId = new Map(state.columns.map(c => [c.id, c]));
+  return state.order.map(id => ({ id, label: byId.get(id).label, name: state.names[id] }));
+}
+
+function build(limit) {
+  const o = opts();
+  return buildOutput({
+    files: state.files, hasHeader: o.hasHeader, includeHeader: o.includeHeader,
+    columns: outputColumns(), fileColumn: o.fileCol ? { name: state.fileColName, withExt: o.withExt } : null,
+    suffix: $('suffix').value, limit
+  });
+}
+
+// ---- preview and warnings ----
+function renderPreview() {
+  const ready = state.files.length && state.order.length;
+  $('previewEmpty').hidden = !!ready;
+  $('previewEmpty').textContent = !state.files.length ? 'Add at least one file to see a preview.'
+    : 'Tick at least one column to see a preview.';
+  $('previewWrap').hidden = $('previewNote').hidden = !ready;
+  $('warnings').hidden = true;
+  if (!ready) return;
+  const o = opts(), out = build(10);
+  const body = o.includeHeader ? out.combined.slice(1) : out.combined;
+  const cell = (tag, v) => '<' + tag + ' title="' + esc(v) + '">' + esc(v) + '</' + tag + '>';
+  $('preview').innerHTML = (o.includeHeader ? '<thead><tr>' + out.header.map(v => cell('th', v)).join('') + '</tr></thead>' : '') +
+    '<tbody>' + body.map(r => '<tr>' + r.map(v => cell('td', v)).join('') + '</tr>').join('') + '</tbody>';
+  const total = state.files.reduce((s, f) => s + Math.max(0, f.rows.length - (o.hasHeader ? 1 : 0)), 0);
+  $('previewNote').textContent = 'First ' + Math.min(10, total) + ' of ' + total.toLocaleString() + ' data rows' +
+    (o.includeHeader ? ', with the header row.' : '. No header row will be written.');
+  if (out.warnings.length) {
+    const lines = out.warnings.map(w => w.column == null ? esc(w.file) + ' has no data rows.'
+      : esc(w.file) + ' has no column “' + esc(w.column) + '”: its cells are left blank.');
+    const shown = lines.slice(0, 15);
+    if (lines.length > shown.length) shown.push('… and ' + (lines.length - shown.length) + ' more.');
+    $('warnings').innerHTML = '<strong>Check these:</strong><ul><li>' + shown.join('</li><li>') + '</li></ul>';
+    $('warnings').hidden = false;
+  }
+}
+
+function renderSuffix() {
+  const first = naturalSort(state.files)[0];
+  const name = first ? first.name : 'F1.csv';
+  $('suffixExample').innerHTML = '<span class="mono">' + esc(name) + '</span> → <span class="mono">' + esc(outputNames([{ name }], $('suffix').value)[0]) + '</span>' +
+    ($('suffix').value === '' ? ' (same name)' : '');
+}
+
+function renderAll() {
+  renderFiles();
+  renderColumns();
+  renderPreview();
+  renderSuffix();
+  setStatus('');
+}
+
+// ---- saving ----
+const CAN_SAVE = typeof window.showSaveFilePicker === 'function';
+const CAN_DIR = typeof window.showDirectoryPicker === 'function';
+$('saveMode').textContent = CAN_SAVE && CAN_DIR
+  ? 'This browser lets you choose where files are saved.'
+  : 'This browser saves to your Downloads folder; separate files arrive as one .zip.';
+
+function setStatus(msg, kind) {
+  const s = $('status');
+  s.hidden = !msg;
+  s.className = 'notice' + (kind ? ' ' + kind : '');
+  s.textContent = msg;
+}
+function ready() {
+  if (!state.files.length) { setStatus('Add at least one file.', 'error'); return false; }
+  if (!state.order.length) { setStatus('Tick at least one column.', 'error'); return false; }
+  return true;
+}
+function download(bytes, name, type) {
+  const url = URL.createObjectURL(new Blob([bytes], { type }));
+  const a = document.createElement('a');
+  a.href = url; a.download = name;
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 30000);
+}
+const isAbort = e => e && e.name === 'AbortError';
+
+async function saveOne() {
+  if (!ready()) return;
+  const out = build();
+  const bytes = utf8Encode(csvText(out.combined));
+  let name = cleanFileName($('combinedName').value.trim() || 'combined.csv');
+  if (!/\.csv$/i.test(name)) name += '.csv';
+  const rows = out.combined.length - (opts().includeHeader ? 1 : 0);
+  if (CAN_SAVE) {
+    let handle = null;
+    try {
+      handle = await window.showSaveFilePicker({ suggestedName: name, types: [{ description: 'CSV file', accept: { 'text/csv': ['.csv'] } }] });
+    } catch (e) {
+      if (isAbort(e)) { setStatus('Save cancelled.'); return; }
+      // refused (for example a page opened from disk): fall back to a normal download
+    }
+    if (handle) {
+      try {
+        const w = await handle.createWritable();
+        await w.write(bytes); await w.close();
+        setStatus('Saved ' + handle.name + ': ' + rows.toLocaleString() + ' data rows.', 'ok');
+      } catch (e) { setStatus('Could not save ' + handle.name + ': ' + e.message, 'error'); }
+      return;
+    }
+  }
+  download(bytes, name, 'text/csv');
+  setStatus('Downloaded ' + name + ': ' + rows.toLocaleString() + ' data rows.', 'ok');
+}
+
+async function saveMany() {
+  if (!ready()) return;
+  const out = build();
+  if (CAN_DIR) {
+    let dir = null;
+    try {
+      dir = await window.showDirectoryPicker({ mode: 'readwrite' });
+    } catch (e) {
+      if (isAbort(e)) { setStatus('Save cancelled.'); return; }
+    }
+    if (dir) {
+      try {
+        const existing = [];
+        for (const s of out.separate) {
+          try { await dir.getFileHandle(s.outName); existing.push(s.outName); } catch (e) { /* not there */ }
+        }
+        if (existing.length && !confirm('These files already exist in “' + dir.name + '” and will be replaced:\n\n' +
+            existing.slice(0, 12).join('\n') + (existing.length > 12 ? '\n… and ' + (existing.length - 12) + ' more' : '') + '\n\nReplace them?')) {
+          setStatus('Nothing saved.'); return;
+        }
+        for (const s of out.separate) {
+          const h = await dir.getFileHandle(s.outName, { create: true });
+          const w = await h.createWritable();
+          await w.write(utf8Encode(csvText(s.rows))); await w.close();
+        }
+        setStatus('Saved ' + out.separate.length + (out.separate.length === 1 ? ' file' : ' files') + ' to the folder “' + dir.name + '”.', 'ok');
+      } catch (e) { setStatus('Could not save to “' + dir.name + '”: ' + e.message, 'error'); }
+      return;
+    }
+  }
+  const zip = makeZip(out.separate.map(s => ({ name: s.outName, data: utf8Encode(csvText(s.rows)) })));
+  const name = 'smart-csv-files.zip';
+  download(zip, name, 'application/zip');
+  setStatus('Downloaded ' + name + ' with ' + out.separate.length + (out.separate.length === 1 ? ' file.' : ' files.'), 'ok');
+}
+
+// ---- events ----
+$('pick').addEventListener('change', e => { addFiles(e.target.files); e.target.value = ''; });
+const drop = $('drop');
+['dragenter', 'dragover'].forEach(t => drop.addEventListener(t, e => { e.preventDefault(); drop.classList.add('over'); }));
+['dragleave', 'drop'].forEach(t => drop.addEventListener(t, () => drop.classList.remove('over')));
+drop.addEventListener('drop', e => { e.preventDefault(); addFiles(e.dataTransfer.files); });
+// a file dropped outside the drop zone should not replace the page
+window.addEventListener('dragover', e => e.preventDefault());
+window.addEventListener('drop', e => e.preventDefault());
+
+$('fileList').addEventListener('click', e => {
+  const b = e.target.closest('[data-remove]');
+  if (!b) return;
+  state.files = state.files.filter(f => f.name !== b.dataset.remove);
+  refreshColumns();
+});
+$('clearFiles').addEventListener('click', () => { state.files = []; refreshColumns(); });
+
+$('optHeader').addEventListener('change', () => {
+  // ids change between names and positions: start again with every column ticked
+  state.order = []; state.names = {}; state.known = new Set();
+  refreshColumns();
+});
+$('optOutHeader').addEventListener('change', renderPreview);
+$('optFileCol').addEventListener('change', () => { $('extChoice').disabled = !$('optFileCol').checked; renderOutList(); renderPreview(); });
+document.querySelectorAll('input[name="ext"]').forEach(r => r.addEventListener('change', () => { renderOutList(); renderPreview(); }));
+
+$('colList').addEventListener('change', e => {
+  const c = state.columns[+e.target.dataset.col];
+  if (!c) return;
+  state.order = state.order.filter(id => id !== c.id);
+  if (e.target.checked) state.order.push(c.id);
+  renderOutList(); renderPreview();
+});
+$('tickAll').addEventListener('click', () => {
+  const have = new Set(state.order);
+  state.columns.forEach(c => { if (!have.has(c.id)) state.order.push(c.id); });
+  renderColumns(); renderPreview();
+});
+$('tickNone').addEventListener('click', () => { state.order = []; renderColumns(); renderPreview(); });
+
+$('outList').addEventListener('input', e => {
+  if (e.target.hasAttribute('data-filecol')) state.fileColName = e.target.value;
+  else if (e.target.dataset.name != null) state.names[state.order[+e.target.dataset.name]] = e.target.value;
+  else return;
+  renderPreview();
+});
+$('outList').addEventListener('click', e => {
+  const b = e.target.closest('button');
+  if (!b || b.disabled) return;
+  if (b.dataset.untick != null) {
+    state.order.splice(+b.dataset.untick, 1);
+    renderColumns(); renderPreview();
+    return;
+  }
+  const k = +b.dataset.k, to = k + +b.dataset.move;
+  if (to < 0 || to >= state.order.length) return;
+  [state.order[k], state.order[to]] = [state.order[to], state.order[k]];
+  renderOutList(); renderPreview();
+  // keep keyboard focus on the moved column's button; at the end of the list use the other arrow
+  const dir = b.dataset.move, list = $('outList');
+  const same = list.querySelector('button[data-k="' + to + '"][data-move="' + dir + '"]');
+  (same && !same.disabled ? same : list.querySelector('button[data-k="' + to + '"][data-move="' + (-dir) + '"]')).focus();
+});
+$('suffix').addEventListener('input', () => { renderSuffix(); setStatus(''); });
+$('saveOne').addEventListener('click', saveOne);
+$('saveMany').addEventListener('click', saveMany);
+
+renderAll();
+</script>
+</body>
+</html>
